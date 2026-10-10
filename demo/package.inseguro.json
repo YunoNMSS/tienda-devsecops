@@ -1,0 +1,17 @@
+{
+  "name": "tienda-devsecops",
+  "version": "1.0.0",
+  "description": "Tienda en línea mínima para demostrar un pipeline DevSecOps",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "demo:inseguro": "node demo/cambio.js inseguro",
+    "demo:corregir": "node demo/cambio.js corregido"
+  },
+  "dependencies": {
+    "express": "5.2.1",
+    "lodash": "4.17.20"
+  }
+}

@@ -1,0 +1,26 @@
+# Reglas SAST propias del proyecto ("seguridad como código").
+rules:
+  - id: no-usar-eval
+    languages: [javascript]
+    severity: ERROR
+    message: No se permite eval() ni new Function(); ejecutan texto como código.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: comando-del-sistema-con-datos-variables
+    languages: [javascript]
+    severity: ERROR
+    message: Ejecutar comandos del sistema con datos variables permite inyección de comandos.
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec($CMD, ...)
+          - pattern: $CP.execSync($CMD, ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+  - id: plantilla-lodash-con-datos-variables
+    languages: [javascript]
+    severity: ERROR
+    message: _.template con texto variable permite inyección de código.
+    patterns:
+      - pattern: _.template($T, ...)
+      - pattern-not: _.template("...", ...)

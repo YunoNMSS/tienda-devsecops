@@ -1,0 +1,3 @@
+node_modules/
+sbom.json
+.env
