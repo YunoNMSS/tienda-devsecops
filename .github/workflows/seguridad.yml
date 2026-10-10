@@ -1,0 +1,75 @@
+name: Pipeline de seguridad
+
+# Corre en cada push a main y en cada pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Mínimo privilegio: el pipeline solo puede leer el repositorio.
+permissions:
+  contents: read
+
+# Las acciones de terceros van fijadas por hash de commit (SHA), no por etiqueta.
+# Una etiqueta se puede mover a código malicioso (caso Trivy, marzo de 2026); un hash no.
+
+jobs:
+  secretos:
+    name: 1. Secretos (Gitleaks)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Descargar Gitleaks y verificar su integridad
+        run: |
+          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check
+          tar -xzf gitleaks.tar.gz -C "$RUNNER_TEMP" gitleaks
+          rm gitleaks.tar.gz
+      - name: Buscar claves y contraseñas en el código
+        run: '"$RUNNER_TEMP/gitleaks" dir . --redact --verbose'
+
+  sast:
+    name: 2. Código propio - SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Instalar Semgrep en una versión fija
+        run: pip install semgrep==1.180.0
+      - name: Analizar el código con las reglas del proyecto
+        run: semgrep scan --config .semgrep/reglas.yml --error --metrics=off --disable-version-check src
+
+  sca:
+    name: 3. Dependencias - SCA (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Buscar vulnerabilidades conocidas en las dependencias
+        run: npm audit --audit-level=high
+
+  sbom:
+    name: 4. Inventario - SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Instalar exactamente lo que dice el archivo de bloqueo, sin ejecutar scripts
+        run: npm ci --ignore-scripts
+      - name: Pruebas de la aplicación
+        run: npm test
+      - name: Generar el SBOM
+        run: npm sbom --sbom-format cyclonedx > sbom.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          path: sbom.json
