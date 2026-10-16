@@ -2,8 +2,8 @@
 const _ = require('lodash');
 const { buscarProducto } = require('./catalogo');
 
-// Clave de la pasarela de pagos (pendiente: mover a una variable de entorno)
-const PASARELA_API_KEY = "k9Xw2PqL7vRt4ZsY8mNb3JcD6hFg1TuE";
+// La clave de la pasarela se lee del entorno. Nunca se escribe en el código.
+const PASARELA_API_KEY = process.env.PASARELA_API_KEY;
 
 function totalCarrito(items) {
   return _.sumBy(items, (item) => {
